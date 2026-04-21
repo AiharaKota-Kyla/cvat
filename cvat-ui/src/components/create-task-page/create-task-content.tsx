@@ -80,7 +80,7 @@ const defaultState: State = {
             cloudStorageId: undefined,
         },
         targetStorage: {
-            location: StorageLocation.CLOUD_STORAGE,
+            location: StorageLocation.LOCAL,
             cloudStorageId: undefined,
         },
         useProjectSourceStorage: false,

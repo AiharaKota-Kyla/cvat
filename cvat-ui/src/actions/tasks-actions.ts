@@ -231,6 +231,13 @@ export function updateTaskInState(task: Task): AnyAction {
 export function createTaskAsync(data: any, onProgress?: (status: string) => void):
 ThunkAction {
     return async (dispatch): Promise<any> => {
+        const sourceStoragePayload = new Storage(
+            data.advanced.sourceStorage ?? { location: StorageLocation.LOCAL },
+        ).toJSON();
+        const targetStoragePayload = new Storage(
+            data.advanced.targetStorage ?? { location: StorageLocation.LOCAL },
+        ).toJSON();
+
         const description: any = {
             name: data.basic.name,
             labels: data.labels,
@@ -238,9 +245,21 @@ ThunkAction {
             use_zip_chunks: data.advanced.useZipChunks,
             use_cache: data.advanced.useCache,
             sorting_method: data.advanced.sortingMethod,
-            source_storage: new Storage(data.advanced.sourceStorage ?? { location: StorageLocation.LOCAL }).toJSON(),
-            target_storage: new Storage(data.advanced.targetStorage ?? { location: StorageLocation.LOCAL }).toJSON(),
         };
+
+        if (
+            sourceStoragePayload.location === StorageLocation.CLOUD_STORAGE &&
+            sourceStoragePayload.cloud_storage_id
+        ) {
+            description.source_storage = sourceStoragePayload;
+        }
+
+        if (
+            targetStoragePayload.location === StorageLocation.CLOUD_STORAGE &&
+            targetStoragePayload.cloud_storage_id
+        ) {
+            description.target_storage = targetStoragePayload;
+        }
 
         if (data.projectId) {
             description.project_id = data.projectId;

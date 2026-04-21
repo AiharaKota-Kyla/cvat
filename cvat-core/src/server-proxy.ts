@@ -209,9 +209,21 @@ function generateError(errorData: AxiosError): ServerError {
                 }
 
                 // serializers fields
-                const message = Object.keys(errorData.response.data).map((key) => (
-                    `**${key}**: ${errorData.response.data[key].toString()}`
-                )).join('\n\n');
+                const message = Object.keys(errorData.response.data).map((key) => {
+                    const value = errorData.response.data[key];
+                    let normalized = '';
+                    if (Array.isArray(value)) {
+                        normalized = value.map((item) => (
+                            typeof item === 'object' ? JSON.stringify(item) : String(item)
+                        )).join(', ');
+                    } else if (value && typeof value === 'object') {
+                        normalized = JSON.stringify(value);
+                    } else {
+                        normalized = String(value);
+                    }
+
+                    return `**${key}**: ${normalized}`;
+                }).join('\n\n');
                 return new ServerError(message, errorData.response.status);
             }
 
