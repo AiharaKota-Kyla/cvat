@@ -12,6 +12,7 @@ import Collapse from 'antd/lib/collapse';
 import notification from 'antd/lib/notification';
 import Text from 'antd/lib/typography/Text';
 import Alert from 'antd/lib/alert';
+import Progress from 'antd/lib/progress';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { ValidateErrorEntity } from 'rc-field-form/lib/interface';
 import { getCore, Storage, StorageLocation } from 'cvat-core-wrapper';
@@ -63,6 +64,7 @@ type State = CreateTaskData & {
     uploadFileErrorMessage: string;
     loading: boolean;
     statusInProgressTask: string;
+    progressInProgressTask: number | null;
 };
 
 const defaultState: State = {
@@ -106,6 +108,7 @@ const defaultState: State = {
     uploadFileErrorMessage: '',
     loading: false,
     statusInProgressTask: '',
+    progressInProgressTask: null,
 };
 
 const UploadFileErrorMessages = {
@@ -222,6 +225,8 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
     private startLoading = (): void => {
         this.setState({
             loading: true,
+            statusInProgressTask: 'Starting task creation',
+            progressInProgressTask: 0,
         });
     };
 
@@ -231,9 +236,10 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
         });
     };
 
-    private changeStatusInProgressTask = (status: string): void => {
+    private changeStatusInProgressTask = (status: string, progress?: number): void => {
         this.setState({
             statusInProgressTask: status,
+            progressInProgressTask: typeof progress === 'number' ? progress : null,
         });
     };
 
@@ -980,10 +986,26 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
     }
 
     private renderFooterSingleTask(): JSX.Element {
-        const { uploadFileErrorMessage, loading, statusInProgressTask: status } = this.state;
+        const {
+            uploadFileErrorMessage,
+            loading,
+            statusInProgressTask: status,
+            progressInProgressTask: progress,
+        } = this.state;
 
         if (status === 'FAILED' || loading) {
-            return (<Alert message={status} />);
+            return (
+                <Alert
+                    message={(
+                        <div className='cvat-create-task-progress'>
+                            <Text>{status}</Text>
+                            {typeof progress === 'number' ? (
+                                <Progress percent={progress} size='small' status='active' />
+                            ) : null}
+                        </div>
+                    )}
+                />
+            );
         }
         return (
             <Row justify='end' gutter={8}>

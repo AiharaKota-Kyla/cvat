@@ -342,13 +342,16 @@ ThunkAction {
 
         try {
             const sourceStorage = description.source_storage;
+            const sourceCloudStorageID = typeof sourceStorage?.cloud_storage_id !== 'undefined' ?
+                Number(sourceStorage.cloud_storage_id) :
+                undefined;
             if (
                 sourceStorage?.location === StorageLocation.CLOUD_STORAGE &&
-                sourceStorage.cloud_storage_id &&
+                Number.isInteger(sourceCloudStorageID) &&
                 extras.clientFiles.length
             ) {
                 onProgress?.('Preparing direct upload to cloud storage...', 0);
-                const [cloudStorage] = await cvat.cloudStorages.get({ id: sourceStorage.cloud_storage_id });
+                const [cloudStorage] = await cvat.cloudStorages.get({ id: sourceCloudStorageID });
                 const uploadPrefix = buildDirectUploadPrefix(description.name, cloudStorage.prefix);
                 const directUploadKeys = extras.clientFiles.map((file: File) => `${uploadPrefix}${file.name}`);
 
@@ -387,7 +390,7 @@ ThunkAction {
                     extras.serverFiles = directUploadKeys;
                 }
                 extras.clientFiles = [];
-                description.data_cloud_storage_id = sourceStorage.cloud_storage_id;
+                description.data_cloud_storage_id = sourceCloudStorageID;
             }
 
             const taskInstance = new cvat.classes.Task(description);
