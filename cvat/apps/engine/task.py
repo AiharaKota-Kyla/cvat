@@ -1000,6 +1000,7 @@ def _filter_cloud_storage_files(
     manifest_file: str | None,
 ) -> tuple[ImageManifestManager | None, str | None]:
     cloud_storage_instance = db_storage_to_storage_instance(cloud_storage)
+    original_server_files_count = len(data["server_files"])
 
     cloud_storage_manifest = None
     cloud_storage_manifest_prefix = None
@@ -1126,6 +1127,16 @@ def _filter_cloud_storage_files(
 
         data["server_files"] = filtered_files
 
+    slogger.cloud_storage[cloud_storage.id].info(
+        "task cloud files filtered: manifest=%s manifest_prefix=%s prefix=%s server_files_before=%d server_files_after=%d sample_files=%s",
+        manifest_file,
+        cloud_storage_manifest_prefix,
+        cloud_storage_instance.prefix,
+        original_server_files_count,
+        len(data["server_files"]),
+        data["server_files"][:5],
+    )
+
     return cloud_storage_manifest, cloud_storage_manifest_prefix
 
 
@@ -1209,6 +1220,14 @@ def create_thread(
             job_file_mapping=job_file_mapping,
             manifest_file=manifest_file,
         )
+        slogger.task[db_task.id].info(
+            "task cloud import prepared: cloud_storage_id=%s manifest=%s manifest_prefix=%s server_files=%d sorting=%s",
+            db_data.cloud_storage_id,
+            manifest_file,
+            cloud_storage_manifest_prefix,
+            len(data["server_files"]),
+            data["sorting_method"],
+        )
 
     # count and validate uploaded files
     media = _count_files(data)
@@ -1267,6 +1286,12 @@ def create_thread(
             if manifest_file:
                 if not is_backup_restore:
                     # Define task manifest content based on cloud storage manifest content and uploaded files
+                    slogger.task[db_task.id].info(
+                        "task cloud import using existing manifest: manifest=%s sorted_media=%d sample_media=%s",
+                        manifest_file,
+                        len(sorted_media),
+                        list(map(os.fspath, sorted_media[:5])),
+                    )
                     _create_task_manifest_based_on_cloud_storage_manifest(
                         sorted_media,
                         cloud_storage_manifest_prefix,
@@ -1275,6 +1300,11 @@ def create_thread(
                     )
             else:  # without manifest file but with use_cache option
                 # Define task manifest content based on list with uploaded files
+                slogger.task[db_task.id].info(
+                    "task cloud import generating manifest from uploaded cloud data: sorted_media=%d sample_media=%s",
+                    len(sorted_media),
+                    list(map(os.fspath, sorted_media[:5])),
+                )
                 _create_task_manifest_from_cloud_data(db_data.cloud_storage, sorted_media, manifest)
 
     av_scan_paths(upload_dir)

@@ -39,7 +39,7 @@ type FormValues = {
 const initialValues: FormValues = {
     customName: undefined,
     targetStorage: {
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
         cloudStorageId: undefined,
     },
     useProjectTargetStorage: false,
@@ -52,7 +52,7 @@ function ExportBackupModal(): JSX.Element {
     const [form] = Form.useForm();
     const [instanceType, setInstanceType] = useState('');
     const [useDefaultStorage, setUseDefaultStorage] = useState(false);
-    const [storageLocation, setStorageLocation] = useState(StorageLocation.LOCAL);
+    const [storageLocation, setStorageLocation] = useState(StorageLocation.CLOUD_STORAGE);
     const [defaultStorageLocation, setDefaultStorageLocation] = useState(StorageLocation.LOCAL);
     const [defaultStorageCloudId, setDefaultStorageCloudId] = useState<number | undefined>(undefined);
     const [helpMessage, setHelpMessage] = useState('');
@@ -130,7 +130,7 @@ function ExportBackupModal(): JSX.Element {
 
     const closeModal = (): void => {
         setUseDefaultStorage(false);
-        setStorageLocation(StorageLocation.LOCAL);
+        setStorageLocation(StorageLocation.CLOUD_STORAGE);
         setLightweight(true);
         form.resetFields();
         if (instance) {

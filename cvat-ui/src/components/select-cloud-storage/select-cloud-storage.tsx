@@ -49,6 +49,14 @@ const searchCloudStoragesWrapper = debounce((phrase, setList) => {
     });
 }, 500);
 
+function getPreferredDefaultStorage(storages: CloudStorage[]): CloudStorage | null {
+    if (!storages.length) {
+        return null;
+    }
+
+    return storages.find((storage) => storage.providerType === ProviderType.AWS_S3_BUCKET) || storages[0];
+}
+
 function SelectCloudStorage(props: Props): JSX.Element {
     const {
         searchPhrase,
@@ -66,6 +74,16 @@ function SelectCloudStorage(props: Props): JSX.Element {
             setInitialList(data);
             if (!list.length) {
                 setList(data);
+            }
+            if (!cloudStorage && !searchPhrase) {
+                const defaultStorage = getPreferredDefaultStorage(data);
+                if (defaultStorage) {
+                    if (defaultStorage.manifests?.length) {
+                        [defaultStorage.manifestPath] = defaultStorage.manifests;
+                    }
+                    setSearchPhrase(defaultStorage.displayName);
+                    onSelectCloudStorage(defaultStorage);
+                }
             }
         });
     }, []);

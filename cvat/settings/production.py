@@ -29,3 +29,5 @@ LOGGING["loggers"]["uvicorn.access"] = {
     "level": "INFO",
     "propagate": False,
 }
+
+CSRF_TRUSTED_ORIGINS = ["https://cvat.road-vision.com"]

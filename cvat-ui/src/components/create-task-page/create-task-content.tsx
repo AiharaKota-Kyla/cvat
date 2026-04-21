@@ -76,15 +76,15 @@ const defaultState: State = {
         useCache: true,
         sortingMethod: SortingMethod.LEXICOGRAPHICAL,
         sourceStorage: {
-            location: StorageLocation.LOCAL,
+            location: StorageLocation.CLOUD_STORAGE,
             cloudStorageId: undefined,
         },
         targetStorage: {
-            location: StorageLocation.LOCAL,
+            location: StorageLocation.CLOUD_STORAGE,
             cloudStorageId: undefined,
         },
-        useProjectSourceStorage: true,
-        useProjectTargetStorage: true,
+        useProjectSourceStorage: false,
+        useProjectTargetStorage: false,
         consensusReplicas: 0,
     },
     quality: {

@@ -60,16 +60,16 @@ const initialValues: AdvancedConfiguration = {
     useCache: true,
     copyData: false,
     sortingMethod: SortingMethod.LEXICOGRAPHICAL,
-    useProjectSourceStorage: true,
-    useProjectTargetStorage: true,
+    useProjectSourceStorage: false,
+    useProjectTargetStorage: false,
     consensusReplicas: 0,
 
     sourceStorage: {
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
         cloudStorageId: undefined,
     },
     targetStorage: {
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
         cloudStorageId: undefined,
     },
 };

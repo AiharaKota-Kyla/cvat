@@ -31,11 +31,11 @@ interface AdvancedConfiguration {
 const initialValues: AdvancedConfiguration = {
     bug_tracker: null,
     sourceStorage: {
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
         cloudStorageId: undefined,
     },
     targetStorage: {
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
         cloudStorageId: undefined,
     },
 };
@@ -124,8 +124,8 @@ function AdvancedConfigurationForm(props: AdvancedConfigurationProps): JSX.Eleme
 
 export default function CreateProjectContent(): JSX.Element {
     const [projectLabels, setProjectLabels] = useState<any[]>([]);
-    const [sourceStorageLocation, setSourceStorageLocation] = useState(StorageLocation.LOCAL);
-    const [targetStorageLocation, setTargetStorageLocation] = useState(StorageLocation.LOCAL);
+    const [sourceStorageLocation, setSourceStorageLocation] = useState(StorageLocation.CLOUD_STORAGE);
+    const [targetStorageLocation, setTargetStorageLocation] = useState(StorageLocation.CLOUD_STORAGE);
     const nameFormRef = useRef<FormInstance>(null);
     const nameInputRef = useRef<Input>(null);
     const advancedFormRef = useRef<FormInstance>(null);
@@ -136,8 +136,8 @@ export default function CreateProjectContent(): JSX.Element {
         if (nameFormRef.current) nameFormRef.current.resetFields();
         if (advancedFormRef.current) advancedFormRef.current.resetFields();
         setProjectLabels([]);
-        setSourceStorageLocation(StorageLocation.LOCAL);
-        setTargetStorageLocation(StorageLocation.LOCAL);
+        setSourceStorageLocation(StorageLocation.CLOUD_STORAGE);
+        setTargetStorageLocation(StorageLocation.CLOUD_STORAGE);
     };
 
     const focusForm = (): void => {

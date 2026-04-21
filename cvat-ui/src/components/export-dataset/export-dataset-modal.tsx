@@ -43,7 +43,7 @@ const initialValues: FormValues = {
     saveImages: false,
     customName: undefined,
     targetStorage: {
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
         cloudStorageId: undefined,
     },
     useProjectTargetStorage: false,
@@ -56,7 +56,7 @@ function ExportDatasetModal(props: Readonly<StateToProps>): JSX.Element {
     const [useDefaultTargetStorage, setUseDefaultTargetStorage] = useState(false);
     const [form] = Form.useForm();
     const [targetStorage, setTargetStorage] = useState<StorageData>({
-        location: StorageLocation.LOCAL,
+        location: StorageLocation.CLOUD_STORAGE,
     });
     const [defaultStorageLocation, setDefaultStorageLocation] = useState(StorageLocation.LOCAL);
     const [defaultStorageCloudId, setDefaultStorageCloudId] = useState<number>();
@@ -151,7 +151,7 @@ function ExportDatasetModal(props: Readonly<StateToProps>): JSX.Element {
 
     const closeModal = (): void => {
         setUseDefaultTargetStorage(false);
-        setTargetStorage({ location: StorageLocation.LOCAL });
+        setTargetStorage({ location: StorageLocation.CLOUD_STORAGE });
         form.resetFields();
         if (instance) {
             dispatch(exportActions.closeExportDatasetModal(instance));

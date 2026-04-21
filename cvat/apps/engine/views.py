@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 import itertools
+import json
 import os
 import os.path as osp
 import shutil
@@ -2775,6 +2776,14 @@ class CloudStorageViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
         expires_in = serializer.validated_data["expires_in"]
         content_type = serializer.validated_data.get("content_type")
 
+        slogger.cloud_storage[db_storage.id].info(
+            "direct-s3 presign requested: keys=%d expires_in=%s content_type=%s sample_keys=%s",
+            len(keys),
+            expires_in,
+            content_type,
+            keys[:3],
+        )
+
         storage = db_storage_to_storage_instance(db_storage)
         prefix = storage.prefix.strip("/") if storage.prefix else ""
         if prefix:
@@ -2799,6 +2808,12 @@ class CloudStorageViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
                     "headers": signed.get("headers", {}),
                 }
             )
+
+        slogger.cloud_storage[db_storage.id].info(
+            "direct-s3 presign generated: keys=%d prefix=%s",
+            len(items),
+            prefix,
+        )
 
         return Response(
             CloudStoragePresignedUploadResponseSerializer(
@@ -2829,6 +2844,13 @@ class CloudStorageViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
         keys = serializer.validated_data["keys"]
         manifest_path = serializer.validated_data["manifest_path"]
 
+        slogger.cloud_storage[db_storage.id].info(
+            "direct-s3 manifest requested: keys=%d manifest_path=%s sample_keys=%s",
+            len(keys),
+            manifest_path,
+            keys[:3],
+        )
+
         storage = db_storage_to_storage_instance(db_storage)
         prefix = storage.prefix.strip("/") if storage.prefix else ""
         if prefix:
@@ -2851,8 +2873,32 @@ class CloudStorageViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             [PurePosixPath(key) for key in keys],
             manifest,
         )
+        manifest_dir = os.path.dirname(manifest_path)
+        if manifest_dir:
+            normalized_lines = []
+            with open(full_manifest_path, encoding="utf-8") as manifest_file:
+                for line in manifest_file:
+                    entry = json.loads(line)
+                    if (
+                        isinstance(entry, dict)
+                        and isinstance(entry.get("name"), str)
+                        and entry["name"].startswith(f"{manifest_dir}/")
+                    ):
+                        entry["name"] = entry["name"][len(manifest_dir) + 1 :]
+                    normalized_lines.append(json.dumps(entry, ensure_ascii=False))
+
+            with open(full_manifest_path, "w", encoding="utf-8") as manifest_file:
+                manifest_file.write("\n".join(normalized_lines))
+                manifest_file.write("\n")
+
         storage.upload_file(full_manifest_path, manifest_path)
         models.Manifest.objects.get_or_create(cloud_storage=db_storage, filename=manifest_path)
+        slogger.cloud_storage[db_storage.id].info(
+            "direct-s3 manifest uploaded: manifest_path=%s keys=%d local_path=%s",
+            manifest_path,
+            len(keys),
+            full_manifest_path,
+        )
 
         return Response(
             CloudStorageGenerateManifestResponseSerializer(
