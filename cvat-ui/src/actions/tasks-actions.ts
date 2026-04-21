@@ -18,6 +18,19 @@ import { updateRequestProgress } from './requests-actions';
 
 const cvat = getCore();
 
+function buildDirectUploadPrefix(taskName: string, cloudPrefix: string | null): string {
+    const sanitizedTaskName = (taskName || 'task').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const prefix = cloudPrefix ? `${cloudPrefix.replace(/\/+$/, '')}/` : '';
+    return `${prefix}cvat-direct-upload/${Date.now()}-${sanitizedTaskName}/`;
+}
+
+function isImageLikeFile(file: File): boolean {
+    if (file.type.startsWith('image/')) {
+        return true;
+    }
+    return /\.(pcd|bin)$/i.test(file.name);
+}
+
 export enum TasksActionTypes {
     GET_TASKS = 'GET_TASKS',
     GET_TASKS_SUCCESS = 'GET_TASKS_SUCCESS',
@@ -295,6 +308,52 @@ ThunkAction {
 
         const taskInstance = new cvat.classes.Task(description);
         try {
+            const sourceStorage = description.source_storage;
+            if (
+                sourceStorage?.location === StorageLocation.CLOUD_STORAGE &&
+                sourceStorage.cloud_storage_id &&
+                extras.clientFiles.length
+            ) {
+                onProgress?.('Preparing direct upload to cloud storage...');
+                const [cloudStorage] = await cvat.cloudStorages.get({ id: sourceStorage.cloud_storage_id });
+                const uploadPrefix = buildDirectUploadPrefix(description.name, cloudStorage.prefix);
+                const directUploadKeys = extras.clientFiles.map((file: File) => `${uploadPrefix}${file.name}`);
+
+                for (let index = 0; index < extras.clientFiles.length; index++) {
+                    const file: File = extras.clientFiles[index];
+                    const key = directUploadKeys[index];
+                    const signed = await cloudStorage.createPresignedUploadUrls([key], {
+                        expiresIn: 900,
+                        ...(file.type ? { contentType: file.type } : {}),
+                    });
+                    const [item] = signed.items;
+                    const uploadResponse = await fetch(item.url, {
+                        method: 'PUT',
+                        headers: item.headers,
+                        body: file,
+                    });
+                    if (!uploadResponse.ok) {
+                        throw new Error(`Failed to upload '${file.name}' directly to cloud storage.`);
+                    }
+                    onProgress?.(`Uploading files to cloud storage ${Math.round(((index + 1) / extras.clientFiles.length) * 100)}%`);
+                }
+
+                const allImageLike = extras.clientFiles.every((file: File) => isImageLikeFile(file));
+                if (allImageLike) {
+                    try {
+                        const manifestPath = `${uploadPrefix}manifest.jsonl`;
+                        const generated = await cloudStorage.generateManifest(directUploadKeys, manifestPath);
+                        extras.serverFiles = [...directUploadKeys, generated.manifestPath];
+                    } catch (_error) {
+                        extras.serverFiles = directUploadKeys;
+                    }
+                } else {
+                    extras.serverFiles = directUploadKeys;
+                }
+                extras.clientFiles = [];
+                description.data_cloud_storage_id = sourceStorage.cloud_storage_id;
+            }
+
             const savedTask = await taskInstance.save(extras, {
                 updateStatusCallback(updateData: Request | UpdateStatusData) {
                     let { message } = updateData;

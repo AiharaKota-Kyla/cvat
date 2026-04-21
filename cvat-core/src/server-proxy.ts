@@ -2003,6 +2003,43 @@ async function getCloudStorageStatus(id) {
     return response.data;
 }
 
+async function createCloudStoragePresignedUploadUrls(
+    id: number,
+    payload: {
+        keys: string[];
+        expires_in?: number;
+        content_type?: string;
+    },
+): Promise<{ expires_in: number; items: { key: string; url: string; headers: Record<string, string> }[] }> {
+    const { backendAPI } = config;
+
+    try {
+        const url = `${backendAPI}/cloudstorages/${id}/presign-upload`;
+        const response = await Axios.post(url, payload);
+        return response.data;
+    } catch (errorData) {
+        throw generateError(errorData);
+    }
+}
+
+async function generateCloudStorageManifest(
+    id: number,
+    payload: {
+        keys: string[];
+        manifest_path?: string;
+    },
+): Promise<{ manifest_path: string; items_count: number }> {
+    const { backendAPI } = config;
+
+    try {
+        const url = `${backendAPI}/cloudstorages/${id}/generate-manifest`;
+        const response = await Axios.post(url, payload);
+        return response.data;
+    } catch (errorData) {
+        throw generateError(errorData);
+    }
+}
+
 async function deleteCloudStorage(id) {
     const { backendAPI } = config;
 
@@ -2588,6 +2625,8 @@ export default Object.freeze({
         getContent: getCloudStorageContent,
         getPreview: getPreview('cloudstorages'),
         getStatus: getCloudStorageStatus,
+        createPresignedUploadUrls: createCloudStoragePresignedUploadUrls,
+        generateManifest: generateCloudStorageManifest,
         create: createCloudStorage,
         delete: deleteCloudStorage,
         update: updateCloudStorage,

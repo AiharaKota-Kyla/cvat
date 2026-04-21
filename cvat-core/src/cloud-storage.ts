@@ -246,6 +246,35 @@ export default class CloudStorage {
         const result = await PluginRegistry.apiWrapper.call(this, CloudStorage.prototype.getStatus);
         return result;
     }
+
+    public async createPresignedUploadUrls(
+        keys: string[],
+        options: {
+            expiresIn?: number;
+            contentType?: string;
+        } = {},
+    ): Promise<{ expiresIn: number; items: { key: string; url: string; headers: Record<string, string> }[] }> {
+        const result = await PluginRegistry.apiWrapper.call(
+            this,
+            CloudStorage.prototype.createPresignedUploadUrls,
+            keys,
+            options,
+        );
+        return result;
+    }
+
+    public async generateManifest(
+        keys: string[],
+        manifestPath?: string,
+    ): Promise<{ manifestPath: string; itemsCount: number }> {
+        const result = await PluginRegistry.apiWrapper.call(
+            this,
+            CloudStorage.prototype.generateManifest,
+            keys,
+            manifestPath,
+        );
+        return result;
+    }
 }
 
 Object.defineProperties(CloudStorage.prototype.save, {
@@ -377,6 +406,47 @@ Object.defineProperties(CloudStorage.prototype.getStatus, {
         value: async function implementation(): Promise<CloudStorageStatus> {
             const result = await serverProxy.cloudStorages.getStatus(this.id);
             return result;
+        },
+    },
+});
+
+Object.defineProperties(CloudStorage.prototype.createPresignedUploadUrls, {
+    implementation: {
+        writable: false,
+        enumerable: false,
+        value: async function implementation(
+            keys: string[],
+            options: { expiresIn?: number; contentType?: string } = {},
+        ): Promise<{ expiresIn: number; items: { key: string; url: string; headers: Record<string, string> }[] }> {
+            const result = await serverProxy.cloudStorages.createPresignedUploadUrls(this.id, {
+                keys,
+                ...(typeof options.expiresIn === 'number' ? { expires_in: options.expiresIn } : {}),
+                ...(options.contentType ? { content_type: options.contentType } : {}),
+            });
+            return {
+                expiresIn: result.expires_in,
+                items: result.items,
+            };
+        },
+    },
+});
+
+Object.defineProperties(CloudStorage.prototype.generateManifest, {
+    implementation: {
+        writable: false,
+        enumerable: false,
+        value: async function implementation(
+            keys: string[],
+            manifestPath?: string,
+        ): Promise<{ manifestPath: string; itemsCount: number }> {
+            const result = await serverProxy.cloudStorages.generateManifest(this.id, {
+                keys,
+                ...(manifestPath ? { manifest_path: manifestPath } : {}),
+            });
+            return {
+                manifestPath: result.manifest_path,
+                itemsCount: result.items_count,
+            };
         },
     },
 });
