@@ -14,6 +14,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import suppress
 from copy import copy
 from datetime import datetime
+from pathlib import PurePosixPath
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -112,6 +113,10 @@ from cvat.apps.engine.serializers import (
     AssetWriteSerializer,
     BasicUserSerializer,
     CloudStorageContentSerializer,
+    CloudStorageGenerateManifestRequestSerializer,
+    CloudStorageGenerateManifestResponseSerializer,
+    CloudStoragePresignedUploadRequestSerializer,
+    CloudStoragePresignedUploadResponseSerializer,
     CloudStorageReadSerializer,
     CloudStorageWriteSerializer,
     CommentReadSerializer,
@@ -142,6 +147,7 @@ from cvat.apps.engine.serializers import (
     TaskWriteSerializer,
     UserSerializer,
 )
+from cvat.apps.engine.task import _create_task_manifest_from_cloud_data
 from cvat.apps.engine.tus import TusFile
 from cvat.apps.engine.types import ExtendedRequest
 from cvat.apps.engine.utils import parse_exception_message, sendfile
@@ -2744,6 +2750,118 @@ class CloudStorageViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
         except Exception as ex:
             msg = str(ex)
             return HttpResponseBadRequest(msg)
+
+    @extend_schema(
+        summary='Create pre-signed S3 upload URLs',
+        request=CloudStoragePresignedUploadRequestSerializer,
+        responses={
+            '200': CloudStoragePresignedUploadResponseSerializer,
+            '403': OpenApiResponse(description='Direct upload is disabled or forbidden'),
+            '400': OpenApiResponse(description='Validation error'),
+        },
+    )
+    @action(detail=True, methods=['POST'], url_path='presign-upload')
+    def presign_upload(self, request: ExtendedRequest, pk: int):
+        if not settings.CVAT_S3_DIRECT_UPLOAD:
+            raise PermissionDenied("Direct S3 upload is disabled.")
+
+        db_storage = self.get_object()
+        if db_storage.provider_type != CloudProviderChoice.AMAZON_S3:
+            raise ValidationError("Pre-signed upload URLs are supported only for AWS S3 cloud storages.")
+
+        serializer = CloudStoragePresignedUploadRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        keys = serializer.validated_data["keys"]
+        expires_in = serializer.validated_data["expires_in"]
+        content_type = serializer.validated_data.get("content_type")
+
+        storage = db_storage_to_storage_instance(db_storage)
+        prefix = storage.prefix.strip("/") if storage.prefix else ""
+        if prefix:
+            prefix = f"{prefix}/"
+            for key in keys:
+                if not key.startswith(prefix):
+                    raise ValidationError(
+                        f"Key '{key}' must start with the configured storage prefix '{prefix}'."
+                    )
+
+        generator = getattr(storage, "generate_presigned_upload_url", None)
+        if not callable(generator):
+            raise ValidationError("Cloud storage provider does not support pre-signed uploads.")
+
+        items = []
+        for key in keys:
+            signed = generator(key, expires_in=expires_in, content_type=content_type)
+            items.append(
+                {
+                    "key": key,
+                    "url": signed["url"],
+                    "headers": signed.get("headers", {}),
+                }
+            )
+
+        return Response(
+            CloudStoragePresignedUploadResponseSerializer(
+                {"expires_in": expires_in, "items": items}
+            ).data
+        )
+
+    @extend_schema(
+        summary='Generate and upload cloud storage manifest',
+        request=CloudStorageGenerateManifestRequestSerializer,
+        responses={
+            '200': CloudStorageGenerateManifestResponseSerializer,
+            '403': OpenApiResponse(description='Direct upload is disabled or forbidden'),
+            '400': OpenApiResponse(description='Validation error'),
+        },
+    )
+    @action(detail=True, methods=['POST'], url_path='generate-manifest')
+    def generate_manifest(self, request: ExtendedRequest, pk: int):
+        if not settings.CVAT_S3_DIRECT_UPLOAD:
+            raise PermissionDenied("Direct S3 upload is disabled.")
+
+        db_storage = self.get_object()
+        if db_storage.provider_type != CloudProviderChoice.AMAZON_S3:
+            raise ValidationError("Manifest auto-generation is supported only for AWS S3 cloud storages.")
+
+        serializer = CloudStorageGenerateManifestRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        keys = serializer.validated_data["keys"]
+        manifest_path = serializer.validated_data["manifest_path"]
+
+        storage = db_storage_to_storage_instance(db_storage)
+        prefix = storage.prefix.strip("/") if storage.prefix else ""
+        if prefix:
+            prefix = f"{prefix}/"
+            for key in keys:
+                if not key.startswith(prefix):
+                    raise ValidationError(
+                        f"Key '{key}' must start with the configured storage prefix '{prefix}'."
+                    )
+            if not manifest_path.startswith(prefix):
+                raise ValidationError(
+                    f"manifest_path '{manifest_path}' must start with the configured storage prefix '{prefix}'."
+                )
+
+        full_manifest_path = db_storage.get_storage_dirname() / manifest_path
+        full_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest = ImageManifestManager(full_manifest_path)
+        _create_task_manifest_from_cloud_data(
+            db_storage,
+            [PurePosixPath(key) for key in keys],
+            manifest,
+        )
+        storage.upload_file(full_manifest_path, manifest_path)
+        models.Manifest.objects.get_or_create(cloud_storage=db_storage, filename=manifest_path)
+
+        return Response(
+            CloudStorageGenerateManifestResponseSerializer(
+                {
+                    "manifest_path": manifest_path,
+                    "items_count": len(keys),
+                }
+            ).data
+        )
 
 @extend_schema(tags=['assets'])
 @extend_schema_view(

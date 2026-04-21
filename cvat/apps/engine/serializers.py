@@ -3880,6 +3880,70 @@ class CloudStorageContentSerializer(serializers.Serializer):
     content = FileInfoSerializer(many=True)
 
 
+class CloudStoragePresignedUploadRequestSerializer(serializers.Serializer):
+    keys = serializers.ListField(
+        child=serializers.CharField(max_length=1024),
+        allow_empty=False,
+    )
+    expires_in = serializers.IntegerField(required=False, default=900, min_value=1, max_value=3600)
+    content_type = serializers.CharField(required=False, max_length=255)
+
+    def validate_keys(self, value: list[str]) -> list[str]:
+        for key in value:
+            if key.startswith("/"):
+                raise serializers.ValidationError("Keys must be relative and cannot start with '/'.")
+            if key.endswith("/"):
+                raise serializers.ValidationError("Object keys must not end with '/'.")
+            if ".." in key.split("/"):
+                raise serializers.ValidationError("Object keys must not contain '..'.")
+        return value
+
+
+class CloudStoragePresignedUploadItemSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    url = serializers.CharField()
+    headers = serializers.DictField(child=serializers.CharField())
+
+
+class CloudStoragePresignedUploadResponseSerializer(serializers.Serializer):
+    expires_in = serializers.IntegerField()
+    items = CloudStoragePresignedUploadItemSerializer(many=True)
+
+
+class CloudStorageGenerateManifestRequestSerializer(serializers.Serializer):
+    keys = serializers.ListField(
+        child=serializers.CharField(max_length=1024),
+        allow_empty=False,
+    )
+    manifest_path = serializers.CharField(required=False, default="manifest.jsonl", max_length=1024)
+
+    def validate_keys(self, value: list[str]) -> list[str]:
+        for key in value:
+            if key.startswith("/"):
+                raise serializers.ValidationError("Keys must be relative and cannot start with '/'.")
+            if key.endswith("/"):
+                raise serializers.ValidationError("Object keys must not end with '/'.")
+            if ".." in key.split("/"):
+                raise serializers.ValidationError("Object keys must not contain '..'.")
+        return value
+
+    def validate_manifest_path(self, value: str) -> str:
+        if value.startswith("/"):
+            raise serializers.ValidationError("manifest_path must be relative and cannot start with '/'.")
+        if value.endswith("/"):
+            raise serializers.ValidationError("manifest_path must point to a file.")
+        if ".." in value.split("/"):
+            raise serializers.ValidationError("manifest_path must not contain '..'.")
+        if not value.endswith(".jsonl"):
+            raise serializers.ValidationError("manifest_path must end with '.jsonl'.")
+        return value
+
+
+class CloudStorageGenerateManifestResponseSerializer(serializers.Serializer):
+    manifest_path = serializers.CharField()
+    items_count = serializers.IntegerField()
+
+
 def _update_related_storages(
     instance: models.Project | models.Task,
     *,

@@ -556,6 +556,7 @@ LOGGING = {
 }
 
 CVAT_LOG_IMPORT_ERRORS = to_bool(os.getenv("CVAT_LOG_IMPORT_ERRORS", False))
+CVAT_S3_DIRECT_UPLOAD = to_bool(os.getenv("CVAT_S3_DIRECT_UPLOAD", False))
 
 if os.getenv("DJANGO_LOG_SERVER_HOST"):
     LOGGING["loggers"]["vector"]["handlers"] += ["vector"]

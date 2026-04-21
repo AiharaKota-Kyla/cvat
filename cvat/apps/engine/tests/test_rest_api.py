@@ -1891,6 +1891,15 @@ class _CloudStorageTestBase(ApiTestBase):
                 for key in files:
                     del self._files[key]
 
+            def generate_presigned_upload_url(
+                self, key: str, /, *, expires_in: int, content_type: str | None = None
+            ) -> dict[str, object]:
+                headers = {"Content-Type": content_type} if content_type else {}
+                return {
+                    "url": f"https://example.test/{key}?expires={expires_in}",
+                    "headers": headers,
+                }
+
         cls._aws_patch = mock.patch("cvat.apps.engine.cloud_provider.S3CloudStorage", MockS3)
         cls._aws_patch.start()
 
@@ -1935,6 +1944,62 @@ class _CloudStorageTestBase(ApiTestBase):
             task = response.data
 
         return task
+
+
+@override_settings(CVAT_S3_DIRECT_UPLOAD=True)
+class CloudStoragePresignUploadAPITestCase(_CloudStorageTestBase):
+    @classmethod
+    def setUpTestData(cls):
+        create_db_users(cls)
+        cls.client = APIClient()
+        cls.cloud_storage_id = cls._create_cloud_storage()
+
+    def test_can_create_presigned_upload_urls(self):
+        payload = {
+            "keys": ["datasets/project/task/images/0001.jpg"],
+            "expires_in": 600,
+            "content_type": "image/jpeg",
+        }
+        with ForceLogin(self.owner, self.client):
+            response = self.client.post(
+                f"/api/cloudstorages/{self.cloud_storage_id}/presign-upload",
+                data=payload,
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["expires_in"], 600)
+        self.assertEqual(len(body["items"]), 1)
+        self.assertEqual(body["items"][0]["key"], payload["keys"][0])
+        self.assertIn("url", body["items"][0])
+        self.assertEqual(body["items"][0]["headers"]["Content-Type"], payload["content_type"])
+
+    def test_can_generate_manifest_and_upload_to_cloud_storage(self):
+        key = "datasets/project/task/images/0001.jpg"
+        image_file = generate_image_file(filename="0001.jpg", size=(16, 12))
+        self.mock_aws.create_file(key, image_file.read())
+
+        payload = {
+            "keys": [key],
+            "manifest_path": "datasets/project/task/manifest.jsonl",
+        }
+        with ForceLogin(self.owner, self.client):
+            response = self.client.post(
+                f"/api/cloudstorages/{self.cloud_storage_id}/generate-manifest",
+                data=payload,
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["manifest_path"], payload["manifest_path"])
+        self.assertEqual(body["items_count"], 1)
+
+        self.assertTrue(self.mock_aws.file_exists(payload["manifest_path"]))
+        manifest = self.mock_aws.retrieve_file(payload["manifest_path"]).decode("utf-8")
+        self.assertIn('"type":"images"', manifest)
+        self.assertIn('"name":"datasets/project/task/images/0001"', manifest)
 
 
 @override_settings(MEDIA_CACHE_ALLOW_STATIC_CACHE=False)

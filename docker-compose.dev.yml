@@ -29,6 +29,8 @@ services:
       COVERAGE_PROCESS_START:
     ports:
       - '127.0.0.1:9090:9090'
+    volumes:
+      - ./cvat:/home/django/cvat
 
   cvat_worker_export:
     environment:

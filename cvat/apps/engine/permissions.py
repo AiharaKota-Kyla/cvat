@@ -284,6 +284,8 @@ class CloudStoragePermission(OpenPolicyAgentPermission):
                 "preview": Scopes.VIEW,
                 "status": Scopes.VIEW,
                 "actions": Scopes.VIEW,
+                "presign_upload": Scopes.VIEW,
+                "generate_manifest": Scopes.UPDATE,
             }[view.action]
         ]
 

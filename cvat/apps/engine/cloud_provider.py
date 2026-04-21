@@ -788,6 +788,35 @@ class S3CloudStorage(AbstractCloudStorage):
 
         return allowed_actions
 
+    @validate_bucket_status
+    def generate_presigned_upload_url(
+        self,
+        key: str,
+        /,
+        *,
+        expires_in: int,
+        content_type: str | None = None,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "Bucket": self.name,
+            "Key": key,
+        }
+        headers: dict[str, str] = {}
+        if content_type:
+            params["ContentType"] = content_type
+            headers["Content-Type"] = content_type
+
+        url = self._client.generate_presigned_url(
+            ClientMethod="put_object",
+            Params=params,
+            ExpiresIn=expires_in,
+            HttpMethod="PUT",
+        )
+        return {
+            "url": url,
+            "headers": headers,
+        }
+
 
 class AzureBlobCloudStorage(AbstractCloudStorage):
     MAX_CONCURRENCY = 3
