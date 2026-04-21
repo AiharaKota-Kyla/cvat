@@ -228,7 +228,7 @@ export function updateTaskInState(task: Task): AnyAction {
     return action;
 }
 
-export function createTaskAsync(data: any, onProgress?: (status: string) => void):
+export function createTaskAsync(data: any, onProgress?: (status: string, progress?: number) => void):
 ThunkAction {
     return async (dispatch): Promise<any> => {
         const sourceStoragePayload = new Storage(
@@ -237,6 +237,21 @@ ThunkAction {
         const targetStoragePayload = new Storage(
             data.advanced.targetStorage ?? { location: StorageLocation.LOCAL },
         ).toJSON();
+
+        if (
+            sourceStoragePayload.location === StorageLocation.CLOUD_STORAGE &&
+            !sourceStoragePayload.cloud_storage_id
+        ) {
+            if (data.cloudStorageId) {
+                sourceStoragePayload.cloud_storage_id = data.cloudStorageId;
+            } else {
+                const storages = await cvat.cloudStorages.get({});
+                const [defaultStorage] = storages;
+                if (defaultStorage?.id) {
+                    sourceStoragePayload.cloud_storage_id = defaultStorage.id;
+                }
+            }
+        }
 
         const description: any = {
             name: data.basic.name,
@@ -325,7 +340,6 @@ ThunkAction {
             extras.consensus_replicas = description.consensus_replicas;
         }
 
-        const taskInstance = new cvat.classes.Task(description);
         try {
             const sourceStorage = description.source_storage;
             if (
@@ -333,7 +347,7 @@ ThunkAction {
                 sourceStorage.cloud_storage_id &&
                 extras.clientFiles.length
             ) {
-                onProgress?.('Preparing direct upload to cloud storage...');
+                onProgress?.('Preparing direct upload to cloud storage...', 0);
                 const [cloudStorage] = await cvat.cloudStorages.get({ id: sourceStorage.cloud_storage_id });
                 const uploadPrefix = buildDirectUploadPrefix(description.name, cloudStorage.prefix);
                 const directUploadKeys = extras.clientFiles.map((file: File) => `${uploadPrefix}${file.name}`);
@@ -354,7 +368,10 @@ ThunkAction {
                     if (!uploadResponse.ok) {
                         throw new Error(`Failed to upload '${file.name}' directly to cloud storage.`);
                     }
-                    onProgress?.(`Uploading files to cloud storage ${Math.round(((index + 1) / extras.clientFiles.length) * 100)}%`);
+                    onProgress?.(
+                        'Uploading files to cloud storage',
+                        Math.round(((index + 1) / extras.clientFiles.length) * 100),
+                    );
                 }
 
                 const allImageLike = extras.clientFiles.every((file: File) => isImageLikeFile(file));
@@ -373,6 +390,7 @@ ThunkAction {
                 description.data_cloud_storage_id = sourceStorage.cloud_storage_id;
             }
 
+            const taskInstance = new cvat.classes.Task(description);
             const savedTask = await taskInstance.save(extras, {
                 updateStatusCallback(updateData: Request | UpdateStatusData) {
                     let { message } = updateData;
@@ -390,7 +408,11 @@ ThunkAction {
                             message = 'Unknown status received';
                         }
                     }
-                    onProgress?.(`${message}${progress ? ` ${Math.floor(progress * 100)}%` : ''}. ${helperMessage}`);
+                    const progressPercent = typeof progress === 'number' ? Math.floor(progress * 100) : undefined;
+                    onProgress?.(
+                        helperMessage ? `${message}. ${helperMessage}` : message,
+                        progressPercent,
+                    );
                     if (updateData instanceof Request) updateRequestProgress(updateData, dispatch);
                 },
             });

@@ -860,7 +860,15 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
 
     private renderFilesBlock(): JSX.Element {
         const { many } = this.props;
-        const { uploadFileErrorMessage } = this.state;
+        const {
+            uploadFileErrorMessage,
+            advanced: {
+                sourceStorage: {
+                    location: sourceStorageLocation,
+                },
+            },
+        } = this.state;
+        const isDirectS3Flow = sourceStorageLocation === StorageLocation.CLOUD_STORAGE;
 
         return (
             <>
@@ -874,6 +882,8 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
                         onUploadRemoteFiles={this.handleUploadRemoteFiles}
                         onUploadShareFiles={this.handleUploadShareFiles}
                         onUploadCloudStorageFiles={this.handleUploadCloudStorageFiles}
+                        disableShareTab={isDirectS3Flow}
+                        disableCloudStorageTab={isDirectS3Flow}
                         ref={(component): void => {
                             this.fileManagerComponent = component;
                         }}

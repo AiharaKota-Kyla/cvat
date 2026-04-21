@@ -10,7 +10,7 @@ import { CreateTaskData } from 'components/create-task-page/create-task-content'
 import { createTaskAsync } from 'actions/tasks-actions';
 
 interface DispatchToProps {
-    onCreate: (data: CreateTaskData, onProgress?: (status: string) => void) => Promise<any>;
+    onCreate: (data: CreateTaskData, onProgress?: (status: string, progress?: number) => void) => Promise<any>;
 }
 
 function mapDispatchToProps(dispatch: any): DispatchToProps {

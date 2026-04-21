@@ -12,7 +12,7 @@ import Text from 'antd/lib/typography/Text';
 import CreateTaskContent, { CreateTaskData } from './create-task-content';
 
 interface Props {
-    onCreate: (data: CreateTaskData, onProgress?: (status: string) => void) => Promise<any>;
+    onCreate: (data: CreateTaskData, onProgress?: (status: string, progress?: number) => void) => Promise<any>;
 }
 
 export default function CreateTaskPage(props: Props): JSX.Element {

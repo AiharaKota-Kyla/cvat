@@ -37,6 +37,8 @@ interface Props {
     onUploadRemoteFiles(urls: string[]): void;
     onUploadShareFiles(files: RemoteFile[]): void;
     onUploadCloudStorageFiles(cloudStorageFiles: RemoteFile[]): void;
+    disableShareTab?: boolean;
+    disableCloudStorageTab?: boolean;
 }
 
 export class FileManager extends React.PureComponent<Props, State> {
@@ -57,6 +59,25 @@ export class FileManager extends React.PureComponent<Props, State> {
             potentialCloudStorage: '',
             active: 'local',
         };
+    }
+
+    public componentDidUpdate(): void {
+        const {
+            onChangeActiveKey,
+            disableShareTab,
+            disableCloudStorageTab,
+        } = this.props;
+        const { active } = this.state;
+
+        if (
+            (active === 'share' && disableShareTab) ||
+            (active === 'cloudStorage' && disableCloudStorageTab)
+        ) {
+            onChangeActiveKey('local');
+            this.setState({
+                active: 'local',
+            });
+        }
     }
 
     private handleUploadCloudStorageFiles = (
@@ -231,9 +252,9 @@ export class FileManager extends React.PureComponent<Props, State> {
                 }}
                 items={[
                     this.renderLocalSelector(),
-                    this.renderShareSelector(),
+                    ...(!this.props.disableShareTab ? [this.renderShareSelector()] : []),
                     this.renderRemoteSelector(),
-                    this.renderCloudStorageSelector(),
+                    ...(!this.props.disableCloudStorageTab ? [this.renderCloudStorageSelector()] : []),
                 ]}
             />
         );
